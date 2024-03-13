@@ -3,6 +3,12 @@
 
 # Go Fish, Online!
 
+```sql
+============================
+ Welcome to Chat & Go Fish!
+============================
+```
+
 A simple cross-platform terminal-based chat app with 'go fish', written in C.
 
 A word from the author:
