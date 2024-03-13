@@ -22,6 +22,7 @@
     #include "./linux_net.c"
 #endif
 
+char buf[4096];
 
 
 /**
@@ -38,12 +39,15 @@
 */
 int main(int argc, char *argv[]){
     bool noUnicode = false;
+    bool debug = false;
     int server_port = 0;
 
     // 1. Parse Arguments
     for(int i = 0; i < argc; i++){
         if(strcmp(argv[i], "--no-unicode") == 0)
             noUnicode = true;
+        if(strcmp(argv[i], "--debug") == 0)
+            debug = true;
         else if(atoi(argv[i]) != 0)
             server_port = atoi(argv[i]);
     }
@@ -70,13 +74,52 @@ int main(int argc, char *argv[]){
     }
     char port_string[5];
     itoa(port, port_string, 10);
-    if(server_port)
-        printf("Connected to server on port " BOLD_NORMAL "%s" FORMAT_OFF "\n", port_string);
-    else
-        printf("Server listening on port " BOLD_NORMAL "%s" FORMAT_OFF "\n", port_string);
+    if(server_port){
+        printf("Connected to server on port " BOLD_NORMAL "%s" FORMAT_OFF "\n\n", port_string);
+        printf("Send them a message! Or type 'go fish' to start a game of go fish, or type '/q' to quit.\n\n");
+        printf(":>> ");
+        fflush(stdout);
+        memset(buf, 0, 4096);
+        scanf("%4095[^\n]", buf);
+        getchar();
+        fflush(stdout);
+        sendMessage(buf, debug);
+        if(strcmp(buf, "/q") == 0){
+            printf("|\n| The connection has been terminated.\n*\n");
+            return closeSocket();
+        }
+    }
+    else{
+        printf("Server listening on port " BOLD_NORMAL "%s" FORMAT_OFF ", waiting for connection...\n\n", port_string);
+        if(serverListen()) //Returns 1 on error
+            return 1;
+        printf("A client has connected! \nOnce they have sent you a message, send a response! ");
+        printf("Or type 'go fish' to start a game of go fish, or type '/q' to quit. \nBut wait for their message first!\n\n.\n");
+        // We have a client!
+    }
     
     // 4. Parse Messages
+    while(true){
+        if(recvMessage(debug))
+            return 1;
+        if(strcmp(recievedMsg, "/q") == 0){
+            printf("|\n| The connection has been terminated.\n*\n");
+            break;
+        }
+        printf("|\n| %s\n|\n", recievedMsg);
 
+        printf(":>> ");
+        fflush(stdout);
+        memset(buf, 0, 4096);
+        scanf("%4095[^\n]", buf);
+        getchar();
+        fflush(stdout);
+        sendMessage(buf, debug);
+        if(strcmp(buf, "/q") == 0){
+            printf("|\n| The connection has been terminated.\n*\n");
+            break;
+        }
+    }
     // 5. Cleanup!
     return closeSocket();
 }

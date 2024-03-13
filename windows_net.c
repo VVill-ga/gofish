@@ -11,6 +11,7 @@
 */
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <time.h>
 #include <ws2tcpip.h>
@@ -19,11 +20,13 @@
 SOCKET ActiveSocket = INVALID_SOCKET;
 
 int port = 0;
+char recievedMsg[4096] = {0};
 
 /**
  *  Returns: status code. 0 if yay, 1 if aww
 */
 int requestSocket(int server_port){
+    port = server_port;
     WSADATA wsaData;
     int iResult = WSAStartup(MAKEWORD(2,2), &wsaData);
     if(iResult != 0){
@@ -119,8 +122,71 @@ int requestSocket(int server_port){
             else if(iResult != SOCKET_ERROR){
                 tryagain = 0;
             }
+
+            //Listen on port
+            if(listen(ActiveSocket, SOMAXCONN) == SOCKET_ERROR){
+                printf("Error on Listen(): %ld\n", WSAGetLastError());
+                closesocket(ActiveSocket);
+                WSACleanup();
+                return 1;
+            }
         }
     }
+    return 0;
+}
+
+// Waits for a connection, then replaces the waiting socket with the direct
+// connection to the connected person.
+int serverListen(){
+    SOCKET tempSocket = accept(ActiveSocket, NULL, NULL);
+    if(tempSocket == INVALID_SOCKET){
+        printf("Error on Accept(): %ld\n", WSAGetLastError());
+        closesocket(ActiveSocket);
+        WSACleanup();
+        return 1;
+    }
+    ActiveSocket = tempSocket;
+    return 0;
+}
+
+int sendMessage(char* msg, bool debug){
+    int bytesSent = 0;
+    while(bytesSent < (int)strlen(msg)){
+        int iResult = send(ActiveSocket, msg+bytesSent, (int)strlen(msg)-bytesSent, 0);
+        if(iResult == SOCKET_ERROR){
+            printf("Error on Send(): %ld\n", WSAGetLastError());
+            closesocket(ActiveSocket);
+            WSACleanup();
+            return 1;
+        }
+        bytesSent += iResult;
+    }
+    if(debug)
+        printf("Sent %d bytes\n", bytesSent);
+    send(ActiveSocket, "END", 3, 0);
+    return 0;
+}
+
+int recvMessage(bool debug){
+    memset(recievedMsg, 0, 4096);
+    int bytesRecieved = 0;
+    int iResult = -1;
+    while(bytesRecieved < 3 || strcmp(recievedMsg+bytesRecieved-3, "END") != 0){
+        iResult = recv(ActiveSocket, recievedMsg+bytesRecieved, 4096-bytesRecieved, 0);
+        if(debug)
+            printf("SNAPSHOT: %s\n", recievedMsg);
+        if(iResult == SOCKET_ERROR){
+            printf("Error on Recv(): %ld\n", WSAGetLastError());
+            closesocket(ActiveSocket);
+            WSACleanup();
+            return 1;
+        }
+        bytesRecieved += iResult;
+    }
+    if(debug)
+        printf("Recieved %d bytes\n", bytesRecieved);
+    //Remove "END"
+    memset(recievedMsg+bytesRecieved-3, 0, 3);
     return 0;
 }
 
