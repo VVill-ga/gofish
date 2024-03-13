@@ -3,6 +3,12 @@
 
 # Go Fish, Online!
 
+```sql
+============================
+ Welcome to Chat & Go Fish!
+============================
+```
+
 A simple cross-platform terminal-based chat app with 'go fish', written in C.
 
 A word from the author:
@@ -26,6 +32,7 @@ The Makefile is not very complicated, so if you would like to compile the progra
 
 Options:
 - `--no-unicode`: Replaces unicode suit characters (♥ ♦ ♣ ♠) with capital letters (H D C S)
+- `--debug`: Enables debug messages, specifically around network message sending/receiving
 
 Parameters:
 - `[PORT]`: Port belonging to the server you would like to connect to. Omitted, the program will start a new server.
