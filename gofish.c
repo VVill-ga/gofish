@@ -13,6 +13,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>   //For seeding the random shuffle
 
 #if defined(_WIN32) || defined(__MSDOS__)
@@ -43,10 +44,23 @@ const int NUM_SUITS = 4;
 const char FACES[] = {'1', '2', '3', '4', '5', '6', '7', '8', '9', 'J', 'Q', 'K', 'A'};
 const int NUM_FACES = 13;
 
+const int NUM_CARDS = NUM_SUITS * NUM_FACES;
+
 typedef struct {
     char suit;
     char face;
 } card;
+
+typedef struct {
+    card*   pond;
+    int     pond_size;
+    card*   hand;
+    int     hand_size;
+    int     books;
+    card*   opponent;
+    int     opponent_size;
+    int     opponent_books;
+}GoFish;
 
 /**
  *  Returns: A pointer to the first card in a complete deck of playing cards
@@ -54,7 +68,7 @@ typedef struct {
  *  S1, S2, S3, ...
 */
 card* generateDeck(){
-    card* deck = malloc(NUM_SUITS * NUM_FACES * sizeof(card));
+    card* deck = malloc(NUM_CARDS * sizeof(card));
     for(int i = 0; i < NUM_SUITS; i++){
         for(int j = 0; j < NUM_FACES; j++){
             deck[(i * NUM_FACES) + j].suit = SUITS[i];
@@ -88,35 +102,114 @@ void shuffleDeck(card* deck, int size){
     }
 }
 
-void printCard(card c){
+void printCard(card c, bool noUnicode){
     if(c.suit == 'H' || c.suit == 'D')
         printf(BOLD_RED);
     else
         printf(BOLD_NORMAL);
-    switch(c.suit){
-        case 'S':
-            //printf("%c" SPADE, c.face);
-            printf(SPADE "%c", c.face);
-            break;
-        case 'C':
-            printf(CLUB "%c", c.face);
-            break;
-        case 'H':
-            printf(HEART "%c", c.face);
-            break;
-        case 'D':
-            printf(DIAMOND "%c", c.face);
-            break;
+    if(noUnicode)
+        printf("%c%c", c.suit, c.face);
+    else{
+        switch(c.suit){
+            case 'S':
+                //printf("%c" SPADE, c.face);
+                printf(SPADE "%c", c.face);
+                break;
+            case 'C':
+                printf(CLUB "%c", c.face);
+                break;
+            case 'H':
+                printf(HEART "%c", c.face);
+                break;
+            case 'D':
+                printf(DIAMOND "%c", c.face);
+                break;
+        }
     }
     printf(FORMAT_OFF);
 }
 
+
+GoFish* initGame(){
+    GoFish* game = malloc(sizeof(GoFish));
+    game->pond = generateDeck();
+    game->pond_size = NUM_CARDS;
+    shuffleDeck(game->pond, NUM_CARDS);
+    game->books = 0;
+    game->opponent_books = 0;
+    // Lazy theoretical max hand is 3 of everything
+    game->hand = malloc(NUM_FACES * (NUM_SUITS - 1) * sizeof(card));
+    game->hand_size = 0;
+    game->opponent = malloc(NUM_FACES * (NUM_SUITS - 1) * sizeof(card));
+    game->opponent_size = 0;
+
+    return game;
+}
+
+bool verifyFaceSelection(GoFish* game, char* face){
+    if(strlen(face) != 1)
+        return false;
+    for(int i = 0; i < game->hand_size; i++){
+        if(game->hand[i].face == *face)
+            return true;
+    }
+    return false;
+}
+
+bool isLying(GoFish* game, char* lookingFor, bool thinksHas){
+    for(int i = 0; i < game->hand_size; i++)
+        if(game->hand[i].face == *lookingFor)
+            return thinksHas;
+    return !thinksHas;
+}
+
+bool processAsk(GoFish* game, char* askedFor){
+    bool goAgain = false;
+    for(int i = 0; i < game->opponent_size; i++){
+        if(game->opponent[i].face == *askedFor){
+            game->hand[game->hand_size] = game->opponent[i];
+            game->opponent[i] = game->opponent[game->opponent_size];
+            game->hand_size++;
+            game->opponent_size--;
+            goAgain = true;
+        }
+    }
+    if(!goAgain){
+        game->hand[game->hand_size] = game->pond[game->pond_size-1];
+        if(game->hand[game->hand_size].face == *askedFor)
+            goAgain = true;
+        game->hand_size++;
+        game->pond_size--;
+    }
+    return goAgain;
+}
+
+void dealCards(bool first, GoFish* game){
+    // 7 cards per hand
+    for(int i = 0; i < 7; i++){
+        if(first)
+            game->hand[i] = game->pond[i];
+        else
+            game->opponent[i] = game->pond[i];
+        game->pond++;
+        game->pond_size--;
+        if(first)
+            game->opponent[i] = game->pond[i];
+        else
+            game->hand[i] = game->pond[i];
+        game->pond++;
+        game->pond_size--;
+    }
+    game->hand_size = 7;
+    game->opponent_size = 7;
+}
+
 int testDeck(){
     card* deck = generateDeck();
-    shuffleDeck(deck, 52);
+    shuffleDeck(deck, NUM_CARDS);
 
     for(int i = 0; i < 52; i++){
-        printCard(deck[i]);
+        printCard(deck[i], false);
         if((i+1) % 13 == 0)
             printf("\n");
         else

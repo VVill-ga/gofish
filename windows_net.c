@@ -149,10 +149,10 @@ int serverListen(){
     return 0;
 }
 
-int sendMessage(char* msg, bool debug){
+int sendMessage(char* msg, int msgLen, bool debug){
     int bytesSent = 0;
-    while(bytesSent < (int)strlen(msg)){
-        int iResult = send(ActiveSocket, msg+bytesSent, (int)strlen(msg)-bytesSent, 0);
+    while(bytesSent < msgLen){
+        int iResult = send(ActiveSocket, msg+bytesSent, msgLen-bytesSent, 0);
         if(iResult == SOCKET_ERROR){
             printf("Error on Send(): %ld\n", WSAGetLastError());
             closesocket(ActiveSocket);

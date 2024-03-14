@@ -18,13 +18,13 @@ A word from the author:
 
 **Requires:**
 - gcc
-- make
+- make*
 
 **Instructions:**
 - On Windows, run: `make windows`
 - On Linux, run: `make linux`
 
-The Makefile is not very complicated, so if you would like to compile the program without installing `make`, that should not be difficult.
+*The Makefile is not very complicated, so if you would like to compile the program without `make`, that should not be difficult.
 
 ## Running
 
@@ -43,5 +43,6 @@ Currently,
 1. Only the Windows networking is implemented
 2. You can only connect to servers on the same computer (try not to cheat)
 3. You may not simply tell the other person "go fish", because that will initiate a game of go fish instead of sending your message.
+4. Same as 3. but with "/q". That quits the program.
 
 I plan on fixing the first two so that you may use this program on Linux and connect to other computers on your local network. I will not fix the third one.

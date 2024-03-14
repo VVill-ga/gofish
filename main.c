@@ -29,22 +29,114 @@ int server_port = 0;
 
 /**
  *      Take Input From User
- * Returns 0 on successful input taking
- * Returns 1 if input is /q (user wants to quit the program)
+ *  Returns 0 on successful input taking
+ *  Returns 1 if input is /q (user wants to quit the program)
 */
-int takeInput(){
+void takeInput(){
     printf(":>> ");
     fflush(stdout);
     memset(buf, 0, 4096);
     scanf("%4095[^\n]", buf);
     getchar();
     fflush(stdout);
-    sendMessage(buf, debug);
-    if(strcmp(buf, "/q") == 0){
-        printf("|\n| The connection has been terminated.\n*\n");
-        return 1;
+}
+
+void printStatus(GoFish* game){
+    printf("|\n| Your hand: ");
+    for(int i = 0; i < game->hand_size; i++){
+        printCard(game->hand[i], noUnicode);
+        printf(" ");
     }
-    return 0;
+    printf("\n| Your books: %d", game->books);
+    printf("\n| Opponent's books: %d\n", game->opponent_books);
+}
+
+void handleMine(GoFish* game){
+    while(processAsk(game, buf)){
+        printf("|\n| You got what you asked for!\n|\n");
+        printStatus(game);
+        printf("|\n| What would you like to ask for?\n| Enter the face value, like 'K' or '9'\n|\n");
+        takeInput();
+        while(!verifyFaceSelection(game, buf)){
+            printf("|\n| That's not a valid face value. Enter one of your face vales.\n|\n");
+            takeInput();
+        }
+        sendMessage(buf, 1, debug);
+        if(recvMessage(debug))
+            return 1;
+    }
+    printf("|\n| You went fishing and got a ");
+    printCard(game->hand[game->hand_size-1], noUnicode);
+    printf("!\n|\n");
+    sendMessage("DONE", 1, debug);
+}
+
+/**
+ *      Takes control of the conversation loop
+ *  isFirst: true if this process sent the first "go fish"
+*/
+int handleGame(bool isFirst){
+    GoFish* game = initGame();
+    if(isFirst){
+        //You sent `go fish`, they send pond:
+        if(recvMessage(debug))
+            return 1;
+        game->pond = (card*)recievedMsg;
+        dealCards(isFirst, game);
+        printStatus(game);
+        printf("|\n| What would you like to ask for?\n| Enter the face value, like 'K' or '9'\n|\n");
+        takeInput();
+        while(!verifyFaceSelection(game, buf)){
+            printf("|\n| That's not a valid face value. Enter one of your face vales.\n|\n");
+            takeInput();
+        }
+        sendMessage(buf, 1, debug);
+    }
+    else{
+        //They sent go fish, you send pond, they send first move:
+        if(debug)
+            printf("Sending initial pond\n");
+        sendMessage((char*)game->pond, 104, debug);
+        dealCards(isFirst, game);
+        printf("|\n| A game of Go Fish has begun! Awaiting your opponent's first move.\n|\n");
+    }
+
+    while(game->pond_size > 0 || game->hand_size > 0 || game->opponent_size > 0){
+        if(recvMessage(debug))
+            return 1;
+        //Message
+        while(strcmp(recievedMsg, "DONE") != 0){
+            printStatus(game);
+            printf("|\n| Opponent asked for %ss. Do you have any? Type 'yes' or 'go fish'.\n|\n", recievedMsg);
+            takeInput();
+            while(strcmp(buf, "yes") != 0 && strcmp(buf, "go fish") != 0){
+                printf("|\n| That's not 'yes' or 'go fish'.\n|\n");
+                takeInput();
+            }
+            while(isLying(game, recievedMsg, strcmp(buf, "yes") != 0)){
+                printf("|\n| You're lying. Is it 'yes' or 'go fish'?\n|\n");
+                takeInput();
+            }
+            sendMessage("OK", 2, debug);
+            //Process what just happened !!!!!!
+        }
+
+        printStatus(game);
+        printf("|\n| What would you like to ask for?\n| Enter the face value, like 'K' or '9'\n|\n");
+        takeInput();
+        while(!verifyFaceSelection(game, buf)){
+            printf("|\n| That's not a valid face value. Enter one of your face vales.\n|\n");
+            takeInput();
+        }
+        sendMessage(buf, 1, debug);
+        if(recvMessage(debug))
+            return 1;
+        handleMine(game);
+    }
+
+    //Set recievedMsg for the person that did not start the game. 
+    //They will be the next to send a message.
+    //That who started the game will next wipe recievedMsg and start listening.
 }
 
 
@@ -96,8 +188,14 @@ int main(int argc, char *argv[]){
     if(server_port){
         printf("Connected to server on port " BOLD_NORMAL "%s" FORMAT_OFF "\n\n", port_string);
         printf("Send them a message! Or type 'go fish' to start a game of go fish, or type '/q' to quit.\n\n");
-        if(takeInput()) //Returns 1 on /q
+        takeInput();
+        sendMessage(buf, strlen(buf), debug);
+        if(strcmp(buf, "/q") == 0){
+            printf("|\n| The connection has been terminated.\n*\n");
             return closeSocket();
+        }
+        else if(strcmp(buf, "go fish") == 0)
+            handleGame(true);
     }
     else{
         printf("Server listening on port " BOLD_NORMAL "%s" FORMAT_OFF ", waiting for connection...\n\n", port_string);
@@ -116,10 +214,18 @@ int main(int argc, char *argv[]){
             printf("|\n| The connection has been terminated.\n*\n");
             break;
         }
+        else if(strcmp(recievedMsg, "go fish") == 0)
+            handleGame(false);
         printf("|\n| %s\n|\n", recievedMsg);
 
-        if(takeInput()) // Returns 1 on /q
+        takeInput();
+        sendMessage(buf, strlen(buf), debug);
+        if(strcmp(buf, "/q") == 0){
+            printf("|\n| The connection has been terminated.\n*\n");
             break;
+        }
+        else if(strcmp(buf, "go fish") == 0)
+            handleGame(true);
     }
     // 5. Cleanup!
     return closeSocket();
