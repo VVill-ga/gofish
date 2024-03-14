@@ -51,7 +51,7 @@ void printStatus(GoFish* game){
     printf("\n| Opponent's books: %d\n", game->opponent_books);
 }
 
-void handleMine(GoFish* game){
+int handleMine(GoFish* game){
     while(processAsk(game, buf)){
         printf("|\n| You got what you asked for!\n|\n");
         printStatus(game);
